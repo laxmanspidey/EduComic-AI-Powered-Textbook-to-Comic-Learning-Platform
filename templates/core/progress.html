@@ -1,70 +1,85 @@
 {% extends 'base.html' %}
 
-{% block title %}My Progress{% endblock %}
+{% block title %}Progress{% endblock %}
+{% block topbar %}Progress{% endblock %}
 
 {% block content %}
 <div class="page-header">
-  <h1 class="page-title">📈 My Progress</h1>
-  <p class="page-subtitle">Track your learning journey across all concepts</p>
+  <h1 class="display">
+    What you know,
+    <span class="display-alt">and what is next</span>
+  </h1>
+  <p class="display-sub">
+    Quiz performance per subtopic. Scores are the share of attempts you
+    answered correctly.
+  </p>
 </div>
-
-{% for textbook in textbooks %}
-<div class="card mb-3">
-  <div class="flex-between mb-2">
-    <div>
-      <div style="font-weight:700;">{{ textbook.title }}</div>
-      <div class="text-sm text-muted">{{ textbook.concept_count }} concepts total</div>
-    </div>
-    <a href="{% url 'textbook_detail' textbook.pk %}" class="btn btn-secondary btn-sm">View →</a>
-  </div>
-
-  {% for chapter in textbook.chapters.all %}
-  <div style="margin-bottom:1rem;">
-    <div style="font-size:0.8rem;font-weight:600;color:var(--text-muted);margin-bottom:0.5rem;">
-      Chapter {{ chapter.number }}: {{ chapter.title }}
-    </div>
-    <div class="flex flex-wrap gap-1">
-      {% for concept in chapter.concepts.all %}
-      <a href="{% url 'concept_detail' concept.pk %}" class="concept-pill">
-        💡 {{ concept.title|truncatechars:25 }}
-      </a>
-      {% endfor %}
-    </div>
-  </div>
-  {% endfor %}
-</div>
-{% empty %}
-<div class="empty-state">
-  <div class="empty-state-icon">📈</div>
-  <div class="empty-state-title">No textbooks yet</div>
-  <div class="empty-state-sub">Upload a textbook to start tracking your progress.</div>
-  <a href="{% url 'textbook_upload' %}" class="btn btn-comic">Upload Textbook →</a>
-</div>
-{% endfor %}
 
 {% if progress_items %}
-<h2 style="font-size:1rem;font-weight:700;margin-bottom:1rem;">Quiz Performance</h2>
-<div class="card">
-  {% for item in progress_items %}
-  {% if item.quiz_attempts > 0 %}
-  <div class="flex-between" style="padding:0.65rem 0; border-bottom:1px solid var(--border-subtle);">
-    <div>
-      <div style="font-size:0.875rem;font-weight:600;">{{ item.concept.title }}</div>
-      <div class="text-xs text-muted">{{ item.concept.chapter.textbook.title|truncatechars:30 }}</div>
-    </div>
-    <div style="text-align:right;">
-      {% if item.quiz_score_pct >= 80 %}
-        <div class="font-bold" style="color:#10b981;">{{ item.quiz_score_pct }}%</div>
-      {% elif item.quiz_score_pct >= 50 %}
-        <div class="font-bold" style="color:#f59e0b;">{{ item.quiz_score_pct }}%</div>
-      {% else %}
-        <div class="font-bold" style="color:#ef4444;">{{ item.quiz_score_pct }}%</div>
-      {% endif %}
-      <div class="text-xs text-muted">{{ item.quiz_correct }} correct / {{ item.quiz_attempts }} attempts</div>
-    </div>
-  </div>
-  {% endif %}
-  {% endfor %}
+<div class="table-wrap">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Subtopic</th>
+        <th>Textbook</th>
+        <th>Viewed</th>
+        <th class="table-num">Attempts</th>
+        <th style="width:180px">Score</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in progress_items %}
+      <tr>
+        <td>
+          <a href="{% url 'concept_detail' item.concept.pk %}" class="font-medium">
+            {{ item.concept.title }}
+          </a>
+          <div class="text-xs text-muted">{{ item.concept.get_difficulty_display }}</div>
+        </td>
+        <td class="text-sm text-secondary">
+          {{ item.concept.chapter.textbook.title|truncatechars:34 }}
+        </td>
+        <td>
+          {% if item.viewed %}
+            <span class="badge badge-success">
+              <svg aria-hidden="true"><use href="#i-check"/></svg> Yes
+            </span>
+          {% else %}
+            <span class="badge">Not yet</span>
+          {% endif %}
+        </td>
+        <td class="table-num tabular">{{ item.quiz_attempts }}</td>
+        <td>
+          {% if item.quiz_attempts %}
+          <div class="meter">
+            <div class="progress {% if item.quiz_score_pct >= 70 %}progress-success{% elif item.quiz_score_pct >= 40 %}progress-warning{% else %}progress-danger{% endif %}">
+              <div class="progress-bar" style="width:{{ item.quiz_score_pct }}%"></div>
+            </div>
+            <span class="meter-value">{{ item.quiz_score_pct }}%</span>
+          </div>
+          <div class="text-xs text-muted mt-2">
+            {{ item.quiz_correct }} of {{ item.quiz_attempts }} correct
+          </div>
+          {% else %}
+          <span class="text-xs text-muted">No attempts</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty">
+  <svg aria-hidden="true"><use href="#i-trending"/></svg>
+  <div class="empty-title">Nothing tracked yet</div>
+  <p class="empty-text">
+    Open a subtopic and answer its quiz. Your score per subtopic will appear
+    here so you can see what needs another pass.
+  </p>
+  <a href="{% url 'dashboard' %}" class="btn btn-primary">
+    <svg aria-hidden="true"><use href="#i-book"/></svg> Browse textbooks
+  </a>
 </div>
 {% endif %}
 {% endblock %}

@@ -1,0 +1,251 @@
+{% extends 'base.html' %}
+
+{% block title %}Retrieval analytics{% endblock %}
+{% block topbar %}Retrieval analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="display">
+    Measured retrieval,
+    <span class="display-alt">not assumed</span>
+  </h1>
+  <p class="display-sub">
+    Effectiveness of each retrieval system on a judged query set, with
+    significance testing &mdash; plus the live search log.
+  </p>
+</div>
+
+{# ══ MEASURED RESULTS ═══════════════════════════════════════════════════ #}
+<section class="mb-6">
+  <h2 class="section-title">Measured effectiveness</h2>
+  <p class="section-sub">
+    Offline evaluation on the test collection. This is the only section that is
+    evidence about retrieval quality.
+  </p>
+
+  {% if has_results %}
+  <div class="table-wrap mb-4">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>System</th>
+          <th style="width:190px">nDCG@10</th>
+          <th class="table-num">nDCG@5</th>
+          <th class="table-num">MRR</th>
+          <th class="table-num">P@1</th>
+          <th class="table-num">vs base</th>
+          <th class="table-num">p</th>
+          <th class="table-num">ms</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td>
+            <span class="font-medium">{{ row.name }}</span>
+            {% if row.significant %}
+            <span class="badge badge-success" title="significant vs baseline">sig</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="meter">
+              <div class="progress"><div class="progress-bar" style="width:{{ row.bar_pct }}%"></div></div>
+              <span class="meter-value">{{ row.ndcg10|floatformat:3 }}</span>
+            </div>
+          </td>
+          <td class="table-num tabular">{{ row.ndcg5|floatformat:3 }}</td>
+          <td class="table-num tabular">{{ row.mrr|floatformat:3 }}</td>
+          <td class="table-num tabular">{{ row.p1|floatformat:3 }}</td>
+          <td class="table-num tabular">
+            {% if row.delta != None %}{{ row.delta|floatformat:3 }}
+            {% else %}<span class="text-muted">baseline</span>{% endif %}
+          </td>
+          <td class="table-num tabular">
+            {% if row.p_value != None %}{{ row.p_value|floatformat:4 }}{% else %}&mdash;{% endif %}
+          </td>
+          <td class="table-num tabular">{{ row.latency|floatformat:0 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <p class="text-xs text-muted mb-4">
+    n = {{ rows.0.n_queries }} queries. &ldquo;sig&rdquo; marks an improvement
+    over the baseline that survived a paired randomisation test with Holm
+    correction (&alpha; 0.05) on {{ primary_measure }}. Rows without it improved
+    the mean but did not reach significance &mdash; with a small collection,
+    most small gains will not.
+  </p>
+
+  <details class="card">
+    <summary style="cursor:pointer;font-weight:var(--weight-medium);font-size:var(--text-sm)">
+      Significance detail, and markdown for a report
+    </summary>
+    <div class="mt-4 stack">
+      <div>
+        <div class="eyebrow mb-2">Significance</div>
+        <pre class="text-xs">{{ significance_markdown }}</pre>
+      </div>
+      <div>
+        <div class="eyebrow mb-2">Comparison table</div>
+        <pre class="text-xs">{{ comparison_markdown }}</pre>
+      </div>
+    </div>
+  </details>
+
+  {% else %}
+  <div class="alert alert-info">
+    <svg aria-hidden="true"><use href="#i-info"/></svg>
+    <div>
+      <div class="alert-title">No experiment has been run yet</div>
+      Build the test collection and run the comparison:
+      <pre class="mt-2 text-xs">venv/Scripts/python.exe tools/run_experiments.py --generate</pre>
+      Until then there are no effectiveness numbers, and the usage statistics
+      below are not a substitute for them.
+    </div>
+  </div>
+  {% endif %}
+</section>
+
+{# ══ TEST COLLECTION ════════════════════════════════════════════════════ #}
+{% if collection_stats %}
+<section class="mb-6">
+  <h2 class="section-title">Test collection</h2>
+  <p class="section-sub">The fixed query set every result above is measured against.</p>
+
+  <div class="grid grid-4">
+    <div class="stat">
+      <div class="stat-label"><svg><use href="#i-help"/></svg> Queries</div>
+      <div class="stat-value">{{ collection_stats.n_queries }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label"><svg><use href="#i-check-circle"/></svg> Judgements</div>
+      <div class="stat-value">{{ collection_stats.n_judgements }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label"><svg><use href="#i-target"/></svg> Relevant / query</div>
+      <div class="stat-value">{{ collection_stats.mean_relevant_per_query|floatformat:2 }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label"><svg><use href="#i-layers"/></svg> Query styles</div>
+      <div class="stat-value" style="font-size:var(--text-lg)">
+        <span class="chip-row">
+          {% for style, count in collection_stats.by_style.items %}
+          <span class="badge">{{ count }} {{ style }}</span>
+          {% endfor %}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  {% if collection_stats.max_relevant_per_query <= 1 %}
+  <p class="text-xs text-muted mt-4">
+    Every query has exactly one relevant passage, so Recall@k equals Success@k
+    and MAP equals MRR. Only MRR and nDCG@k are reported above &mdash; the
+    others would be duplicate columns.
+  </p>
+  {% endif %}
+</section>
+{% endif %}
+
+{# ══ LIVE SEARCH LOG ════════════════════════════════════════════════════ #}
+<section>
+  <h2 class="section-title">Live search log</h2>
+  <p class="section-sub">
+    What was actually searched, and where the time went. Usage data &mdash; not
+    evidence about retrieval quality.
+  </p>
+
+  {% if recent_queries %}
+  <div class="grid grid-3 mb-4">
+    <div class="card">
+      <div class="card-header"><div class="card-title">Query intent</div></div>
+      <div class="stack-sm">
+        {% for intent, count in intent_counts %}
+        <div class="row-between">
+          <span class="text-sm">{{ intent }}</span>
+          <span class="badge badge-accent">{{ count }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      <p class="text-xs text-muted mt-4">
+        Classified by surface form &mdash; rule-based, so it costs microseconds.
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><div class="card-title">Mean time per stage</div></div>
+      <div class="stack-sm">
+        {% for stage, value, pct in stage_means %}
+        <div class="meter">
+          <span class="text-xs" style="width:64px">{{ stage }}</span>
+          <div class="progress"><div class="progress-bar" style="width:{{ pct }}%"></div></div>
+          <span class="meter-value text-xs">{{ value|floatformat:1 }}&nbsp;ms</span>
+        </div>
+        {% endfor %}
+      </div>
+      <p class="text-xs text-muted mt-4">
+        Reranking dominates by design: it scores every candidate against the
+        query with a transformer rather than looking anything up.
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><div class="card-title">Rewriting</div></div>
+      <div class="stat-value">
+        {{ rewritten_count }}<span class="text-muted text-lg">/{{ query_total }}</span>
+      </div>
+      <p class="text-xs text-muted mt-2">
+        queries rewritten against conversation history. Most are self-contained
+        and skip the model entirely.
+      </p>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Query</th><th>Intent</th><th>System</th>
+          <th class="table-num">Results</th><th class="table-num">ms</th><th>When</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in recent_queries %}
+        <tr>
+          <td>
+            <div class="font-medium">{{ entry.query_text|truncatechars:52 }}</div>
+            {% if entry.was_rewritten %}
+            <div class="text-xs text-muted">&rarr; {{ entry.rewritten_text|truncatechars:52 }}</div>
+            {% endif %}
+            {% if entry.expansion_terms %}
+            <div class="text-xs text-muted">+ {{ entry.expansion_terms|join:", "|truncatechars:56 }}</div>
+            {% endif %}
+          </td>
+          <td><span class="badge badge-accent">{{ entry.intent|default:"&mdash;" }}</span></td>
+          <td class="text-sm">{{ entry.system }}</td>
+          <td class="table-num tabular">{{ entry.result_count }}</td>
+          <td class="table-num tabular">{{ entry.total_ms|floatformat:0 }}</td>
+          <td class="text-xs text-muted">{{ entry.created_at|date:"M j, H:i" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% else %}
+  <div class="empty">
+    <svg aria-hidden="true"><use href="#i-inbox"/></svg>
+    <div class="empty-title">No searches yet</div>
+    <p class="empty-text">
+      Open a textbook and use <strong>Ask this textbook</strong> to populate
+      this log.
+    </p>
+    <a href="{% url 'dashboard' %}" class="btn btn-primary">
+      <svg aria-hidden="true"><use href="#i-book"/></svg> Browse textbooks
+    </a>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

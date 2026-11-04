@@ -106,3 +106,67 @@ Contributions are welcome! Please feel free to submit a Pull Request or open an 
 ## 📄 License
 
 This project is licensed under the MIT License.
+
+---
+
+## 🔍 EduRetrieve: the Information Retrieval layer
+
+The comic and quiz generators sit on top of a multi-stage hybrid retrieval
+framework. Full documentation: **[docs/RETRIEVAL.md](docs/RETRIEVAL.md)**
+
+**Pipeline**
+
+```
+PDF -> passages -> [ TF-IDF | BM25 | Dense ] -> RRF fusion
+     -> cross-encoder reranking -> context assembly
+     -> Ask-the-textbook / Comic / Quiz
+```
+
+**What it adds**
+
+- **Hybrid retrieval** - BM25 over a hand-written inverted index, fused with
+  dense embeddings by Reciprocal Rank Fusion. Each arm covers the other's
+  blind spot: lexical matching finds acronyms and exact terminology, semantic
+  matching finds paraphrases.
+- **Cross-encoder reranking** - scores query and passage *together* rather
+  than independently.
+- **Query expansion** - classical RM3 pseudo-relevance feedback, and an
+  LLM-based expander, so the two can be compared.
+- **Conversational rewriting** - resolves follow-ups like *"why does it
+  increase?"* against the conversation, behind a rule gate so self-contained
+  queries skip the model entirely.
+- **Explainable results** - every result shows matched terms, each retriever's
+  score and rank, its share of the fused score, and how far the reranker
+  moved it.
+- **A full evaluation harness** - synthetic test collection, P@k / R@k / MRR /
+  MAP / nDCG@k implemented from scratch, ablations, and paired randomisation
+  tests with Holm correction.
+
+**Pages**
+
+| Page | What it does |
+|---|---|
+| `/textbook/<id>/search/` | Ask your textbook, with per-result explanations |
+| `/textbook/<id>/compare/` | The same query through five retrieval systems |
+| `/retrieval/` | Measured effectiveness, significance tests, live search log |
+
+**Running it**
+
+```bash
+# generate the test collection once (needs Ollama), then evaluate
+venv/Scripts/python.exe tools/run_experiments.py --generate --passages 60
+
+# re-run against the saved collection (no Ollama needed)
+venv/Scripts/python.exe tools/run_experiments.py
+
+# vet PDFs before adding them to the corpus
+venv/Scripts/python.exe tools/check_pdfs.py media/textbooks
+
+# verify
+venv/Scripts/python.exe -m unittest discover -s tests
+venv/Scripts/python.exe tools/smoke_views.py
+```
+
+**Extra dependencies** beyond `requirements.txt`: `scikit-learn`, `scipy`,
+`rank_bm25` (the last only to assert the hand-written BM25 matches a reference
+implementation).

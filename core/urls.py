@@ -1,7 +1,13 @@
 from django.urls import path
-from . import views
+from . import ir_views, views
 
 urlpatterns = [
+    # Information Retrieval
+    path('textbook/<uuid:pk>/search/', ir_views.textbook_search, name='textbook_search'),
+    path('textbook/<uuid:pk>/compare/', ir_views.search_compare, name='search_compare'),
+    path('retrieval/', ir_views.ir_dashboard, name='ir_dashboard'),
+    path('retrieval/judge/', ir_views.judge_passage, name='judge_passage'),
+
     # Auth
     path('register/', views.register_view, name='register'),
 

@@ -1,51 +1,58 @@
 {% extends 'base.html' %}
 
-{% block title %}My Comics Library{% endblock %}
+{% block title %}My comics{% endblock %}
+{% block topbar %}My comics{% endblock %}
 
 {% block content %}
 <div class="page-header">
-  <h1 class="page-title">🎨 My Comics Library</h1>
-  <p class="page-subtitle">All your AI-generated comic lessons in one place</p>
+  <h1 class="display">
+    Your comics,
+    <span class="display-alt">page by page</span>
+  </h1>
+  <p class="display-sub">Every comic lesson you have generated, newest first.</p>
 </div>
 
 {% if comics %}
-<div class="comic-grid">
+<div class="grid grid-cards">
   {% for comic in comics %}
-  <a href="{% url 'comic_view' comic.pk %}" class="comic-card" style="text-decoration:none;">
-    <div class="comic-card-thumb" style="position:relative;">
-      {% with first_panel=comic.panels.first %}
-      {% if first_panel and first_panel.image %}
-        <img src="{{ first_panel.image.url }}" alt="{{ comic.concept.title }}">
-      {% else %}
-        <div class="flex-center" style="height:200px;font-size:3rem;color:var(--text-muted);">🎨</div>
-      {% endif %}
+  <a href="{% url 'comic_view' comic.pk %}" class="tile">
+    <div class="tile-media">
+      {% with panel=comic.panels.first %}
+        {% if panel and panel.image %}
+          <img src="{{ panel.image.url }}" alt="">
+        {% else %}
+          <svg aria-hidden="true"><use href="#i-image"/></svg>
+        {% endif %}
       {% endwith %}
-      <div style="position:absolute;top:0.5rem;left:0.5rem;">
-        <span class="badge badge-purple">{{ comic.get_art_style_display }}</span>
-      </div>
+      <span class="tile-media-badge">
+        <span class="badge badge-accent">{{ comic.get_art_style_display }}</span>
+      </span>
     </div>
-    <div class="comic-card-body">
-      <div class="comic-card-title">{{ comic.concept.title }}</div>
-      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">
-        {{ comic.concept.chapter.textbook.title|truncatechars:35 }}
-      </div>
-      <div class="flex items-center gap-1" style="margin-top:0.5rem;">
-        <span class="badge badge-blue">{{ comic.get_level_display }}</span>
-        <span class="badge badge-green">{{ comic.panel_count }} panels</span>
-      </div>
-      <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.5rem;">
-        {{ comic.created_at|date:"M d, Y" }}
+    <div class="tile-body">
+      <div class="tile-title clamp-2">{{ comic.concept.title }}</div>
+      <div class="tile-meta truncate">{{ comic.concept.chapter.textbook.title }}</div>
+      <div class="tile-foot row-between">
+        <span class="chip-row">
+          <span class="badge">{{ comic.get_level_display }}</span>
+          <span class="badge">{{ comic.panel_count }} panels</span>
+        </span>
+        <span class="text-xs text-muted">{{ comic.created_at|date:"M j" }}</span>
       </div>
     </div>
   </a>
   {% endfor %}
 </div>
 {% else %}
-<div class="empty-state">
-  <div class="empty-state-icon">🎨</div>
-  <div class="empty-state-title">No comics yet</div>
-  <div class="empty-state-sub">Upload a textbook and generate your first comic lesson!</div>
-  <a href="{% url 'textbook_upload' %}" class="btn btn-comic">Upload Textbook →</a>
+<div class="empty">
+  <svg aria-hidden="true"><use href="#i-image"/></svg>
+  <div class="empty-title">No comics yet</div>
+  <p class="empty-text">
+    Open a textbook, pick a subtopic, and generate a comic lesson for it.
+    Each one is drawn from passages retrieved out of your own book.
+  </p>
+  <a href="{% url 'dashboard' %}" class="btn btn-primary">
+    <svg aria-hidden="true"><use href="#i-book"/></svg> Browse textbooks
+  </a>
 </div>
 {% endif %}
 {% endblock %}

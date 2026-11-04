@@ -1,349 +1,375 @@
 {% extends 'base.html' %}
 
 {% block title %}{{ concept.title }}{% endblock %}
+{% block topbar %}{{ concept.title }}{% endblock %}
 
 {% block content %}
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <a href="{% url 'dashboard' %}">Dashboard</a>
+  <span class="breadcrumb-sep" aria-hidden="true">/</span>
+  <a href="{% url 'textbook_detail' textbook.pk %}">{{ textbook.title|truncatechars:30 }}</a>
+  <span class="breadcrumb-sep" aria-hidden="true">/</span>
+  <span aria-current="page">{{ concept.title|truncatechars:40 }}</span>
+</nav>
+
 <div class="page-header">
-  <div class="breadcrumb">
-    <a href="{% url 'dashboard' %}">Dashboard</a>
-    <span class="breadcrumb-sep">›</span>
-    <a href="{% url 'textbook_detail' textbook.pk %}">{{ textbook.title|truncatechars:30 }}</a>
-    <span class="breadcrumb-sep">›</span>
-    <span>{{ concept.title|truncatechars:30 }}</span>
+  <div class="chip-row mb-2">
+    <span class="eyebrow">Chapter {{ concept.chapter.number }}</span>
+    <span class="badge">{{ concept.get_difficulty_display }}</span>
   </div>
+  <h1 class="page-title">{{ concept.title }}</h1>
+  <p class="page-subtitle">{{ concept.description }}</p>
 </div>
 
-<div class="two-col">
-  <!-- Left: Concept + Generation -->
-  <div class="two-col-left">
-    <!-- Concept Header -->
-    <div class="comic-title-header" style="margin-bottom:1.5rem;">
-      <div class="badge badge-purple" style="margin-bottom:0.75rem;">
-        Chapter {{ concept.chapter.number }}
-      </div>
-      <h1 style="font-family:var(--font-comic);font-size:2rem;color:white;letter-spacing:0.04em;">
-        {{ concept.title }}
-      </h1>
-      <p style="color:rgba(255,255,255,0.75);font-size:0.9rem;margin-top:0.5rem;">
-        {{ concept.description }}
-      </p>
-    </div>
+<div class="split">
+  {# ── Main column ───────────────────────────────────────────────────── #}
+  <div class="stack">
 
-    <!-- Existing comics -->
+    {# Existing comics #}
     {% if comics %}
-    <h2 style="font-size:1rem;font-weight:700;margin-bottom:1rem;">Your Generated Comics</h2>
-    <div class="comic-grid mb-4">
-      {% for comic in comics %}
-      <a href="{% url 'comic_view' comic.pk %}" class="comic-card" style="text-decoration:none;">
-        <div class="comic-card-thumb">
-          {% with first_panel=comic.panels.first %}
-          {% if first_panel and first_panel.image %}
-            <img src="{{ first_panel.image.url }}" alt="">
-          {% else %}
-            <div class="flex-center" style="height:180px;color:var(--text-muted);font-size:2.5rem;">🎨</div>
-          {% endif %}
-          {% endwith %}
-          <div style="position:absolute;top:0.5rem;right:0.5rem;">
-            <span class="status-dot {{ comic.status }}"></span>
+    <section>
+      <h2 class="section-title">Comic lessons</h2>
+      <p class="section-sub">Generated for this subtopic.</p>
+      <div class="grid grid-cards">
+        {% for comic in comics %}
+        <a href="{% url 'comic_view' comic.pk %}" class="tile">
+          <div class="tile-media">
+            {% with panel=comic.panels.first %}
+              {% if panel and panel.image %}
+                <img src="{{ panel.image.url }}" alt="">
+              {% else %}
+                <svg aria-hidden="true"><use href="#i-image"/></svg>
+              {% endif %}
+            {% endwith %}
+            <span class="tile-media-badge">
+              <span class="status status-{{ comic.status }}">{{ comic.get_status_display }}</span>
+            </span>
           </div>
-        </div>
-        <div class="comic-card-body">
-          <div class="comic-card-title">{{ comic.get_level_display }} · {{ comic.get_art_style_display }}</div>
-          <div class="flex gap-1 mt-1">
-            <span class="badge badge-purple">{{ comic.panel_count }} panels</span>
-          </div>
-        </div>
-      </a>
-      {% endfor %}
-    </div>
-    {% endif %}
-
-    <!-- Generate new comic -->
-    <div class="card" style="border-color: var(--border-accent);">
-      <h2 style="font-size:1rem;font-weight:700;margin-bottom:1.5rem;">🎨 Generate a Comic Lesson</h2>
-
-      <!-- Level selector -->
-      <div class="form-group">
-        <label class="form-label">Your knowledge level</label>
-        <div class="level-selector">
-          <div class="level-option selected" data-level="beginner" onclick="selectLevel(this)">
-            <div class="level-radio"></div>
-            <div>
-              <div style="font-weight:600;font-size:0.875rem;">Beginner</div>
-              <div class="text-xs text-muted">Simple analogies, no equations</div>
+          <div class="tile-body">
+            <div class="tile-title">{{ comic.get_level_display }} · {{ comic.get_art_style_display }}</div>
+            <div class="tile-meta">
+              {{ comic.panel_count }} panel{{ comic.panel_count|pluralize }} ·
+              {{ comic.created_at|date:"M j, Y" }}
             </div>
           </div>
-          <div class="level-option" data-level="intermediate" onclick="selectLevel(this)">
-            <div class="level-radio"></div>
-            <div>
-              <div style="font-weight:600;font-size:0.875rem;">Intermediate</div>
-              <div class="text-xs text-muted">Key concepts + examples</div>
-            </div>
-          </div>
-          <div class="level-option" data-level="revision" onclick="selectLevel(this)">
-            <div class="level-radio"></div>
-            <div>
-              <div style="font-weight:600;font-size:0.875rem;">Exam Revision</div>
-              <div class="text-xs text-muted">Formulas + key points</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Art style -->
-      <div class="form-group">
-        <label class="form-label">Visual style</label>
-        <div class="style-selector">
-          <div class="style-option selected" data-style="comic" onclick="selectStyle(this)">
-            <div class="style-option-icon">🎨</div>
-            Comic
-          </div>
-          <div class="style-option" data-style="manga" onclick="selectStyle(this)">
-            <div class="style-option-icon">⛩️</div>
-            Manga
-          </div>
-          <div class="style-option" data-style="cartoon" onclick="selectStyle(this)">
-            <div class="style-option-icon">😄</div>
-            Cartoon
-          </div>
-          <div class="style-option" data-style="realistic" onclick="selectStyle(this)">
-            <div class="style-option-icon">🏛️</div>
-            Realistic
-          </div>
-        </div>
-      </div>
-
-      <button class="btn btn-comic btn-full btn-lg" id="generate-btn" onclick="startGeneration()">
-        ✨ Generate Comic Lesson
-      </button>
-
-      <!-- Generation progress -->
-      <div id="gen-progress" style="display:none; margin-top:1.5rem;">
-        <div class="generation-panel">
-          <div class="spinner" style="margin:0 auto 1rem;"></div>
-          <div style="font-weight:700;font-size:1rem;margin-bottom:0.5rem;">AI is creating your comic…</div>
-          <div style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1.5rem;">
-            This takes about 2–5 minutes on your RTX 4060
-          </div>
-          <div class="generation-steps">
-            <div class="gen-step active" id="step-rag">🔍 Retrieving concepts from textbook</div>
-            <div class="gen-step" id="step-story">📝 Generating story panels</div>
-            <div class="gen-step" id="step-prompts">✍️ Building Animagine prompts</div>
-            <div class="gen-step" id="step-comfy">🎨 Generating images (ComfyUI)</div>
-            <div class="gen-step" id="step-compose">🖼️ Composing comic panels</div>
-          </div>
-          <div style="font-size:0.75rem;color:var(--text-muted);" id="gen-panel-count"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Right: Quiz + Textbook reference -->
-  <div class="two-col-right">
-    <!-- Quick Quiz -->
-    {% if quizzes %}
-    <div class="quiz-card" style="margin-bottom:1rem;">
-      <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:1rem;">🧠 Quick Check</div>
-
-      {% with quiz=quizzes.first %}
-      <div class="quiz-question">{{ quiz.question }}</div>
-      <div class="quiz-options" id="quiz-options-{{ quiz.pk }}">
-        {% for option in quiz.options %}
-        <div class="quiz-option" onclick="selectAnswer(this, {{ quiz.pk }}, {{ forloop.counter0 }})">
-          <div class="quiz-radio"></div>
-          <span>{{ option }}</span>
-        </div>
+        </a>
         {% endfor %}
       </div>
-      <div id="quiz-result-{{ quiz.pk }}" class="quiz-result"></div>
-      <button class="btn btn-primary btn-full" onclick="submitAnswer({{ quiz.pk }})" id="quiz-btn-{{ quiz.pk }}">
-        Check Answer
-      </button>
-      {% endwith %}
-    </div>
+    </section>
     {% endif %}
 
-    <!-- Source Reference -->
-    <div class="card">
-      <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:0.75rem;">📚 Based on your textbook</div>
-      <div style="font-size:0.8rem;color:var(--text-secondary);line-height:1.6;">
-        {{ concept.description }}
+    {# Generator #}
+    <section class="card" id="generator">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Generate a comic lesson</div>
+          <div class="card-meta">
+            Passages are retrieved from your textbook, then drawn as panels.
+          </div>
+        </div>
       </div>
+
+      <div class="field">
+        <span class="label" id="levelLabel">Your level</span>
+        <div class="option-grid" role="radiogroup" aria-labelledby="levelLabel">
+          <button type="button" class="option is-selected" role="radio" aria-checked="true"
+                  data-level="beginner">
+            <span class="option-label">Beginner</span>
+            <span class="option-desc">Simple analogies, no equations</span>
+          </button>
+          <button type="button" class="option" role="radio" aria-checked="false"
+                  data-level="intermediate">
+            <span class="option-label">Intermediate</span>
+            <span class="option-desc">Key concepts with examples</span>
+          </button>
+          <button type="button" class="option" role="radio" aria-checked="false"
+                  data-level="revision">
+            <span class="option-label">Exam revision</span>
+            <span class="option-desc">Formulas and key points</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="label" id="styleLabel">Visual style</span>
+        <div class="option-grid" role="radiogroup" aria-labelledby="styleLabel">
+          <button type="button" class="option is-selected" role="radio" aria-checked="true"
+                  data-style="comic">
+            <span class="option-label">Comic</span>
+            <span class="option-desc">Colourful, expressive</span>
+          </button>
+          <button type="button" class="option" role="radio" aria-checked="false" data-style="manga">
+            <span class="option-label">Manga</span>
+            <span class="option-desc">Black and white</span>
+          </button>
+          <button type="button" class="option" role="radio" aria-checked="false" data-style="cartoon">
+            <span class="option-label">Cartoon</span>
+            <span class="option-desc">Friendly and simple</span>
+          </button>
+          <button type="button" class="option" role="radio" aria-checked="false" data-style="realistic">
+            <span class="option-label">Realistic</span>
+            <span class="option-desc">Detailed illustration</span>
+          </button>
+        </div>
+      </div>
+
+      <button type="button" class="btn btn-primary btn-lg btn-block" id="generateBtn">
+        <svg aria-hidden="true"><use href="#i-sparkle"/></svg> Generate comic lesson
+      </button>
+      <p class="hint text-center">
+        Takes a few minutes. Requires the background worker and ComfyUI to be running.
+      </p>
+
+      {# Progress #}
+      <div class="card-divider hidden" id="genProgress">
+        <div class="row mb-4">
+          <div class="spinner" aria-hidden="true"></div>
+          <strong class="text-sm">Generating your comic</strong>
+        </div>
+        <div class="steps" id="genSteps">
+          <div class="step" data-step="0">
+            <span class="step-marker">1</span> Retrieving passages from your textbook
+          </div>
+          <div class="step" data-step="1">
+            <span class="step-marker">2</span> Writing the storyboard
+          </div>
+          <div class="step" data-step="2">
+            <span class="step-marker">3</span> Drawing the panels
+          </div>
+          <div class="step" data-step="3">
+            <span class="step-marker">4</span> Adding captions and speech bubbles
+          </div>
+        </div>
+      </div>
+
+      <div class="alert alert-danger mt-4 hidden" id="genError" role="alert">
+        <svg aria-hidden="true"><use href="#i-alert"/></svg>
+        <div><span id="genErrorText"></span></div>
+      </div>
+    </section>
+  </div>
+
+  {# ── Rail ──────────────────────────────────────────────────────────── #}
+  <aside class="split-rail stack">
+
+    {% if quizzes %}
+    {% with quiz=quizzes.first %}
+    <section class="card">
+      <div class="card-header">
+        <div class="card-title">Quick check</div>
+        <span class="card-meta">1 of {{ quizzes|length }}</span>
+      </div>
+
+      <p class="quiz-question">{{ quiz.question }}</p>
+
+      <div class="quiz-options" id="quizOptions">
+        {% for option in quiz.options %}
+        <button type="button" class="quiz-option" data-index="{{ forloop.counter0 }}">
+          <span class="quiz-marker" aria-hidden="true">
+            <svg><use href="#i-check"/></svg>
+          </span>
+          <span>{{ option }}</span>
+        </button>
+        {% endfor %}
+      </div>
+
+      <div class="quiz-feedback" id="quizFeedback" role="status"></div>
+
+      <button type="button" class="btn btn-primary btn-block mt-4" id="quizSubmit"
+              data-quiz-id="{{ quiz.pk }}">
+        Check answer
+      </button>
+    </section>
+    {% endwith %}
+    {% endif %}
+
+    <section class="card">
+      <div class="card-header">
+        <div class="card-title">From your textbook</div>
+      </div>
+      <p class="text-sm text-secondary">{{ concept.description }}</p>
+
       {% if concept.page_references %}
-      <div class="divider" style="margin:0.75rem 0;"></div>
-      <div style="font-size:0.75rem;color:var(--text-muted);">
-        Pages {% for p in concept.page_references %}{{ p }}{% if not forloop.last %}, {% endif %}{% endfor %}
+      <div class="text-xs text-muted mt-4">
+        Pages {{ concept.page_references|join:", " }}
       </div>
       {% endif %}
-      <a href="{{ textbook.pdf_file.url }}" target="_blank" class="btn btn-secondary btn-full btn-sm" style="margin-top:0.75rem;">
-        View Original Source
-      </a>
-    </div>
 
-    <!-- Progress -->
+      <a href="{% url 'textbook_search' textbook.pk %}?q={{ concept.title|urlencode }}"
+         class="btn btn-secondary btn-sm btn-block mt-4">
+        <svg aria-hidden="true"><use href="#i-search"/></svg> Search the textbook
+      </a>
+    </section>
+
     {% if progress %}
-    <div class="card" style="margin-top:1rem;">
-      <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:0.75rem;">📊 Your Progress</div>
-      <div class="flex-between mb-1">
-        <span class="text-sm">Quiz Score</span>
-        <span class="font-bold text-accent">{{ progress.quiz_score_pct }}%</span>
+    <section class="card">
+      <div class="card-header">
+        <div class="card-title">Your progress</div>
       </div>
-      <div class="progress-bar-wrap">
-        <div class="progress-bar-fill" style="width:{{ progress.quiz_score_pct }}%"></div>
+      <div class="meter">
+        <div class="progress {% if progress.quiz_score_pct >= 70 %}progress-success{% elif progress.quiz_score_pct >= 40 %}progress-warning{% else %}progress-danger{% endif %}">
+          <div class="progress-bar" style="width:{{ progress.quiz_score_pct }}%"></div>
+        </div>
+        <span class="meter-value">{{ progress.quiz_score_pct }}%</span>
       </div>
-      <div class="text-xs text-muted mt-1">{{ progress.quiz_correct }}/{{ progress.quiz_attempts }} correct</div>
-    </div>
+      <div class="text-xs text-muted mt-2">
+        {{ progress.quiz_correct }} of {{ progress.quiz_attempts }} quiz
+        attempt{{ progress.quiz_attempts|pluralize }} correct
+      </div>
+    </section>
     {% endif %}
-  </div>
+  </aside>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-let selectedLevel = 'beginner';
-let selectedStyle = 'comic';
-let currentComicId = null;
-let pollInterval = null;
+(function () {
+  // ── Option groups (level, style) ───────────────────────────────────────
+  var chosen = { level: 'beginner', style: 'comic' };
 
-function selectLevel(el) {
-  document.querySelectorAll('.level-option').forEach(x => x.classList.remove('selected'));
-  el.classList.add('selected');
-  selectedLevel = el.dataset.level;
-}
-
-function selectStyle(el) {
-  document.querySelectorAll('.style-option').forEach(x => x.classList.remove('selected'));
-  el.classList.add('selected');
-  selectedStyle = el.dataset.style;
-}
-
-function startGeneration() {
-  const btn = document.getElementById('generate-btn');
-  btn.disabled = true;
-  btn.textContent = '⏳ Starting…';
-  document.getElementById('gen-progress').style.display = 'block';
-
-  fetch('{% url "generate_comic" concept.pk %}', {
-    method: 'POST',
-    headers: {
-      'X-CSRFToken': getCookie('csrftoken'),
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: `level=${selectedLevel}&art_style=${selectedStyle}`,
-  })
-  .then(r => r.json())
-  .then(data => {
-    if (data.comic_id) {
-      currentComicId = data.comic_id;
-      pollGeneration(currentComicId);
-    } else {
-      showGenError(data.error || 'Unknown error');
-    }
-  })
-  .catch(e => showGenError(e.toString()));
-}
-
-const stepSequence = ['step-rag', 'step-story', 'step-prompts', 'step-comfy', 'step-compose'];
-let currentStep = 0;
-
-function advanceStep() {
-  if (currentStep < stepSequence.length) {
-    const el = document.getElementById(stepSequence[currentStep]);
-    if (el) {
-      el.classList.remove('active');
-      el.classList.add('done');
-      el.textContent = '✅ ' + el.textContent.replace(/^[^a-zA-Z]*/, '');
-    }
-    currentStep++;
-    if (currentStep < stepSequence.length) {
-      const next = document.getElementById(stepSequence[currentStep]);
-      if (next) next.classList.add('active');
-    }
-  }
-}
-
-function pollGeneration(comicId) {
-  let stepTimer = setInterval(advanceStep, 18000);
-
-  pollInterval = setInterval(() => {
-    fetch(`/comic/${comicId}/status/`)
-      .then(r => r.json())
-      .then(data => {
-        if (data.panels_ready > 0) {
-          document.getElementById('gen-panel-count').textContent =
-            `${data.panels_ready} panel${data.panels_ready !== 1 ? 's' : ''} generated…`;
-        }
-        if (data.status === 'ready') {
-          clearInterval(pollInterval);
-          clearInterval(stepTimer);
-          window.location.href = `/comic/${comicId}/`;
-        } else if (data.status === 'error') {
-          clearInterval(pollInterval);
-          clearInterval(stepTimer);
-          showGenError(data.error || 'Generation failed');
-        }
-      })
-      .catch(() => {});
-  }, 5000);
-}
-
-function showGenError(msg) {
-  document.getElementById('gen-progress').innerHTML =
-    `<div class="alert alert-error">❌ ${msg}</div>`;
-  document.getElementById('generate-btn').disabled = false;
-  document.getElementById('generate-btn').textContent = '✨ Try Again';
-}
-
-// Quiz
-let selectedAnswers = {};
-
-function selectAnswer(el, quizId, idx) {
-  document.querySelectorAll(`#quiz-options-${quizId} .quiz-option`).forEach(o => o.classList.remove('selected'));
-  el.classList.add('selected');
-  selectedAnswers[quizId] = idx;
-}
-
-function submitAnswer(quizId) {
-  const selected = selectedAnswers[quizId];
-  if (selected === undefined) {
-    alert('Please select an answer first!');
-    return;
-  }
-
-  fetch(`/quiz/${quizId}/submit/`, {
-    method: 'POST',
-    headers: {
-      'X-CSRFToken': getCookie('csrftoken'),
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: `selected_index=${selected}`,
-  })
-  .then(r => r.json())
-  .then(data => {
-    const resultEl = document.getElementById(`quiz-result-${quizId}`);
-    const options = document.querySelectorAll(`#quiz-options-${quizId} .quiz-option`);
-
-    options.forEach((opt, i) => {
-      if (i === data.correct_index) opt.classList.add('correct');
-      else if (i === selected && !data.correct) opt.classList.add('wrong');
+  document.querySelectorAll('[role="radiogroup"]').forEach(function (group) {
+    group.addEventListener('click', function (e) {
+      var option = e.target.closest('.option');
+      if (!option) return;
+      group.querySelectorAll('.option').forEach(function (o) {
+        o.classList.remove('is-selected');
+        o.setAttribute('aria-checked', 'false');
+      });
+      option.classList.add('is-selected');
+      option.setAttribute('aria-checked', 'true');
+      if (option.dataset.level) chosen.level = option.dataset.level;
+      if (option.dataset.style) chosen.style = option.dataset.style;
     });
-
-    resultEl.style.display = 'block';
-    if (data.correct) {
-      resultEl.className = 'quiz-result correct-msg';
-      resultEl.textContent = '✅ Correct! ' + data.explanation;
-    } else {
-      resultEl.className = 'quiz-result wrong-msg';
-      resultEl.textContent = '❌ Not quite. ' + data.explanation;
-    }
-
-    document.getElementById(`quiz-btn-${quizId}`).disabled = true;
   });
-}
 
-function getCookie(name) {
-  let v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
-  return v ? v[2] : null;
-}
+  // ── Comic generation ───────────────────────────────────────────────────
+  var generateBtn = document.getElementById('generateBtn');
+  var progressBox = document.getElementById('genProgress');
+  var errorBox = document.getElementById('genError');
+  var steps = Array.prototype.slice.call(document.querySelectorAll('#genSteps .step'));
+  var stepTimer = null, pollTimer = null, stepIndex = 0;
+
+  function markStep(i) {
+    steps.forEach(function (s, idx) {
+      s.classList.toggle('is-done', idx < i);
+      s.classList.toggle('is-active', idx === i);
+      if (idx < i) s.querySelector('.step-marker').innerHTML =
+        '<svg aria-hidden="true"><use href="#i-check"/></svg>';
+    });
+  }
+
+  function fail(message) {
+    clearInterval(stepTimer);
+    clearInterval(pollTimer);
+    progressBox.classList.add('hidden');
+    errorBox.classList.remove('hidden');
+    document.getElementById('genErrorText').textContent = message;
+    generateBtn.disabled = false;
+  }
+
+  if (generateBtn) generateBtn.addEventListener('click', function () {
+    generateBtn.disabled = true;
+    errorBox.classList.add('hidden');
+    progressBox.classList.remove('hidden');
+    stepIndex = 0;
+    markStep(0);
+
+    var body = new URLSearchParams();
+    body.set('level', chosen.level);
+    body.set('art_style', chosen.style);
+
+    fetch("{% url 'generate_comic' concept.pk %}", {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': window.csrfToken(),
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: body.toString()
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data.comic_id) { fail(data.error || 'Could not start generation.'); return; }
+
+      // Advance the step display on a timer: the backend reports only
+      // pending/generating/ready, so these are an honest approximation of
+      // where it has got to rather than a real progress signal.
+      stepTimer = setInterval(function () {
+        if (stepIndex < steps.length - 1) markStep(++stepIndex);
+      }, 20000);
+
+      pollTimer = setInterval(function () {
+        fetch('/comic/' + data.comic_id + '/status/')
+          .then(function (r) { return r.json(); })
+          .then(function (s) {
+            if (s.status === 'ready') {
+              clearInterval(stepTimer); clearInterval(pollTimer);
+              markStep(steps.length);
+              location.href = '/comic/' + data.comic_id + '/';
+            } else if (s.status === 'error') {
+              fail(s.error || 'Generation failed. Check the worker logs.');
+            }
+          })
+          .catch(function () { /* transient: keep polling */ });
+      }, 5000);
+    })
+    .catch(function () { fail('Could not reach the server.'); });
+  });
+
+  // ── Quiz ───────────────────────────────────────────────────────────────
+  var options = document.getElementById('quizOptions');
+  var submit = document.getElementById('quizSubmit');
+  var feedback = document.getElementById('quizFeedback');
+  var selected = null;
+
+  if (options) options.addEventListener('click', function (e) {
+    var option = e.target.closest('.quiz-option');
+    if (!option || option.disabled) return;
+    options.querySelectorAll('.quiz-option').forEach(function (o) {
+      o.classList.remove('is-selected');
+    });
+    option.classList.add('is-selected');
+    selected = parseInt(option.dataset.index, 10);
+  });
+
+  if (submit) submit.addEventListener('click', function () {
+    if (selected === null) {
+      feedback.className = 'quiz-feedback is-visible quiz-feedback';
+      feedback.textContent = 'Choose an answer first.';
+      return;
+    }
+    // quizId is read from a data attribute rather than interpolated into
+    // JavaScript: it is a UUID, and an unquoted UUID in a JS expression is a
+    // syntax error that silently breaks the handler.
+    var quizId = submit.dataset.quizId;
+
+    fetch('/quiz/' + quizId + '/submit/', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': window.csrfToken(),
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: 'selected_index=' + selected
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      options.querySelectorAll('.quiz-option').forEach(function (o, i) {
+        o.disabled = true;
+        o.classList.remove('is-selected');
+        if (i === data.correct_index) o.classList.add('is-correct');
+        else if (i === selected && !data.correct) o.classList.add('is-wrong');
+      });
+      feedback.className = 'quiz-feedback is-visible ' +
+        (data.correct ? 'is-correct' : 'is-wrong');
+      feedback.textContent = (data.correct ? 'Correct. ' : 'Not quite. ') +
+        (data.explanation || '');
+      submit.disabled = true;
+    })
+    .catch(function () {
+      feedback.className = 'quiz-feedback is-visible is-wrong';
+      feedback.textContent = 'Could not submit your answer.';
+    });
+  });
+})();
 </script>
 {% endblock %}

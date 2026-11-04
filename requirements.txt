@@ -11,3 +11,8 @@ numpy==1.26.4
 markdown==3.7
 django-cleanup==8.1.0
 whitenoise==6.7.0
+
+# Information Retrieval layer
+scikit-learn==1.9.1
+scipy==1.17.1
+rank_bm25==0.2.2

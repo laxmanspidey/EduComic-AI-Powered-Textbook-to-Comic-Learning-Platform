@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+
+{% block title %}Compare retrieval systems{% endblock %}
+{% block topbar %}Compare systems{% endblock %}
+
+{% block content %}
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <a href="{% url 'dashboard' %}">Dashboard</a>
+  <span class="breadcrumb-sep" aria-hidden="true">/</span>
+  <a href="{% url 'textbook_detail' textbook.pk %}">{{ textbook.title|truncatechars:30 }}</a>
+  <span class="breadcrumb-sep" aria-hidden="true">/</span>
+  <span aria-current="page">Compare</span>
+</nav>
+
+<div class="page-header">
+  <h1 class="display">
+    Classical and neural,
+    <span class="display-alt">side by side</span>
+  </h1>
+  <p class="display-sub">The same query through five retrieval systems.</p>
+</div>
+
+<div class="alert alert-warning mb-6">
+  <svg aria-hidden="true"><use href="#i-alert"/></svg>
+  <div>
+    <div class="alert-title">An illustration, not evidence</div>
+    One query cannot establish that one method beats another: relevance judged
+    by eye on a truncated snippet is unreliable. The measured comparison, over
+    a judged query set with significance testing, is on the
+    <a href="{% url 'ir_dashboard' %}">analytics page</a>.
+  </div>
+</div>
+
+{% if build_error %}
+<div class="alert alert-danger" role="alert">
+  <svg aria-hidden="true"><use href="#i-alert"/></svg>
+  <div>{{ build_error }}</div>
+</div>
+
+{% else %}
+
+<form method="get" class="card mb-6" role="search">
+  <div class="input-group">
+    <input type="search" name="q" value="{{ query }}" class="input"
+           placeholder="e.g. what does CAP mean" aria-label="Query" autofocus>
+    <button type="submit" class="btn btn-primary">
+      <svg aria-hidden="true"><use href="#i-scale"/></svg> Compare
+    </button>
+    <a href="{% url 'textbook_search' textbook.pk %}?q={{ query|urlencode }}"
+       class="btn btn-secondary">Back to search</a>
+  </div>
+</form>
+
+{% if columns %}
+
+{% if agreement %}
+<div class="card mb-6">
+  <div class="card-header">
+    <div class="card-title">System agreement on this query</div>
+    <span class="card-meta tabular">{{ agreement.ratio|floatformat:2 }} overlap</span>
+  </div>
+  <div class="meter mb-4">
+    <div class="progress"><div class="progress-bar" style="width:{{ agreement.ratio|floatformat:2 }}00%"></div></div>
+    <span class="meter-value">{{ agreement.shared }}/{{ agreement.union }}</span>
+  </div>
+  <p class="text-sm text-muted">
+    {% if agreement.ratio > 0.8 %}
+      The systems almost entirely agree, so this query cannot distinguish them.
+      Fusion and reranking have nothing to work with when every retriever
+      returns the same set.
+    {% elif agreement.ratio < 0.3 %}
+      The systems largely disagree, which is where fusion contributes most
+      &mdash; each retriever is finding passages the others miss.
+    {% else %}
+      Partial agreement: the systems share some passages and differ on others.
+    {% endif %}
+  </p>
+</div>
+{% endif %}
+
+<div style="overflow-x:auto;padding-bottom:var(--space-2)">
+  <div style="display:grid;grid-auto-flow:column;grid-auto-columns:minmax(210px,1fr);gap:var(--space-4);min-width:980px">
+    {% for column in columns %}
+    <section class="card card-compact">
+      <div class="card-header" style="margin-bottom:var(--space-3)">
+        <div class="card-title">{{ column.label }}</div>
+        <span class="card-meta mono">{{ column.total_ms|floatformat:0 }} ms</span>
+      </div>
+
+      {% if column.results %}
+      <ol class="stack-sm" style="list-style:none;padding:0">
+        {% for result in column.results %}
+        <li style="padding-top:var(--space-3);border-top:1px solid var(--border)">
+          <div class="row" style="gap:var(--space-2)">
+            <span class="result-rank">{{ result.rank }}</span>
+            <code class="text-xs truncate">{{ result.passage_id|cut:"::"|truncatechars:20 }}</code>
+          </div>
+          <p class="text-xs text-muted mt-2" style="line-height:var(--leading-snug)">
+            {{ result.text|truncatechars:96 }}
+          </p>
+          {% if result.matched_terms %}
+          <div class="chip-row mt-2">
+            {% for term in result.matched_terms|slice:":3" %}
+            <span class="badge badge-warning">{{ term }}</span>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ol>
+      {% else %}
+      <p class="text-xs text-muted">
+        Nothing returned &mdash; no passage shares a term with this query.
+      </p>
+      {% endif %}
+    </section>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card mt-6">
+  <div class="card-header"><div class="card-title">What to look for</div></div>
+  <ul class="text-sm text-secondary" style="line-height:var(--leading-relaxed);padding-left:var(--space-5)">
+    <li><strong>TF-IDF and BM25</strong> return nothing when your wording shares
+        no stem with the textbook. That is the terminology-mismatch failure.</li>
+    <li><strong>Dense</strong> always returns something, because every passage
+        gets a similarity score &mdash; including passages merely on a related
+        topic. That is the semantic-overranking failure.</li>
+    <li><strong>Hybrid</strong> keeps both: exact terms from the lexical arm,
+        paraphrases from the semantic one.</li>
+    <li><strong>The full pipeline</strong> adds query expansion and a
+        cross-encoder, which scores query and passage together rather than
+        separately.</li>
+  </ul>
+</div>
+
+{% elif query %}
+<div class="empty">
+  <svg aria-hidden="true"><use href="#i-search"/></svg>
+  <div class="empty-title">No results from any system</div>
+  <p class="empty-text">Nothing in this textbook matched that query.</p>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

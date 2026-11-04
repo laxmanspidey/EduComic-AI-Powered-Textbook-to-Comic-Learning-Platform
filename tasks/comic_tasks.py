@@ -30,10 +30,10 @@ def process_textbook(textbook_id: str):
     django.setup()
 
     from core.models import Textbook, Chapter, Concept, Quiz
+    from core import ir_service
     from rag.extractor import extract_text_by_pages, detect_chapters, get_chapter_text, get_total_pages
     from rag.chunker import chunk_pages
     from rag.embedder import index_chunks
-    from rag.retriever import retrieve, build_context
     from agents.curriculum_agent import analyze_chapter
     from agents.quiz_agent import generate_quiz
 
@@ -54,6 +54,20 @@ def process_textbook(textbook_id: str):
         # Step 2: Detect chapters (3 strategies: regex → font-size → auto-split)
         chapters_data = detect_chapters(pages, pdf_path=pdf_path)
         print(f"[Task] Detected {len(chapters_data)} chapters")
+
+        # Build the retrieval engine once and reuse it for every concept.
+        # Calling ir_service.get_engine() per concept would be correct but
+        # wasteful: each call re-fits BM25 and TF-IDF, and this task saves the
+        # textbook several times, which invalidates the version-keyed cache.
+        ir_engine = None
+        try:
+            ir_engine = ir_service.get_engine(textbook, rebuild=True)
+            print(f"[Task] IR engine ready: {ir_engine.stats()}")
+        except Exception as ir_error:
+            # Quiz generation still works without retrieved context, just with
+            # less grounding, so this must not abort processing.
+            print(f"[Task] WARNING: IR engine unavailable ({ir_error}); "
+                  f"quizzes will be generated without retrieved context")
 
         # Step 3: Process each chapter
         for ch_data in chapters_data:
@@ -94,10 +108,15 @@ def process_textbook(textbook_id: str):
                 )
 
                 if created:
-                    # Retrieve context and generate quiz
-                    ctx_chunks = retrieve(str(textbook_id), concept_data['title'],
-                                         n_results=3, chapter_number=ch_data['number'])
-                    ctx_text = build_context(ctx_chunks, max_words=400)
+                    # Retrieve context (hybrid + reranked) and generate quiz
+                    ctx_text = ''
+                    if ir_engine is not None:
+                        try:
+                            ctx_text = ir_engine.context_for(
+                                concept_data['title'], max_words=400, top_k=3)
+                        except Exception as ctx_error:
+                            print(f"[Task] context retrieval failed for "
+                                  f"'{concept_data['title']}': {ctx_error}")
                     quizzes = generate_quiz(
                         concept_title=concept_data['title'],
                         concept_description=concept_data.get('description', ''),
@@ -147,7 +166,7 @@ def generate_comic(comic_strip_id: str):
     django.setup()
 
     from core.models import ComicStrip, ComicPanel
-    from rag.retriever import retrieve, build_context
+    from core import ir_service
     from agents.storyboard_agent import generate_storyboard
     from agents.prompt_agent import build_all_prompts
     from comicgen.comfyui_client import ComfyUIClient
@@ -165,15 +184,22 @@ def generate_comic(comic_strip_id: str):
         chapter = concept.chapter
         textbook = chapter.textbook
 
-        # Step 1: Retrieve RAG context
-        print(f"[Task] Retrieving RAG context for: {concept.title}")
-        ctx_chunks = retrieve(
-            str(textbook.id),
-            concept.title,
-            n_results=5,
-            chapter_number=chapter.number,
-        )
-        context_text = build_context(ctx_chunks, max_words=600)
+        # Step 1: Retrieve context via the hybrid pipeline.
+        #
+        # Replaces the dense-only path this task used to take. Two differences
+        # that reach the generated comic: retrieval is BM25 + dense fused and
+        # then cross-encoder reranked, and each block carries its citation, so
+        # a caption can be traced back to a page. Same engine the search page
+        # uses, so the measured retrieval numbers describe this path too.
+        print(f"[Task] Retrieving context for: {concept.title}")
+        context_text = ''
+        try:
+            context_text = ir_service.retrieve_context(
+                textbook, concept.title, max_words=600, top_k=5)
+        except Exception as ir_error:
+            print(f"[Task] WARNING: retrieval unavailable ({ir_error}); "
+                  f"the storyboard agent will work from the concept "
+                  f"description alone")
 
         # Step 2: Generate storyboard
         print(f"[Task] Generating storyboard for: {concept.title}")

@@ -1,0 +1,369 @@
+{% extends 'base.html' %}
+
+{% block title %}Ask {{ textbook.title }}{% endblock %}
+{% block topbar %}Ask · {{ textbook.title }}{% endblock %}
+
+{% block content %}
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <a href="{% url 'dashboard' %}">Dashboard</a>
+  <span class="breadcrumb-sep" aria-hidden="true">/</span>
+  <a href="{% url 'textbook_detail' textbook.pk %}">{{ textbook.title|truncatechars:34 }}</a>
+  <span class="breadcrumb-sep" aria-hidden="true">/</span>
+  <span aria-current="page">Ask</span>
+</nav>
+
+<div class="{% if not query %}hero{% else %}page-header{% endif %}">
+  <h1 class="display">
+    Ask anything,
+    <span class="display-alt">get grounded answers</span>
+  </h1>
+  <p class="display-sub">
+    Hybrid retrieval over <strong>{{ textbook.title }}</strong>. Ask in your own
+    words &mdash; every result shows why it was retrieved.
+  </p>
+</div>
+
+{% if build_error %}
+<div class="alert alert-danger" role="alert">
+  <svg aria-hidden="true"><use href="#i-alert"/></svg>
+  <div>
+    <div class="alert-title">This textbook cannot be searched</div>
+    {{ build_error }}
+  </div>
+</div>
+
+{% else %}
+
+{# ── Search form ─────────────────────────────────────────────────────── #}
+<form method="get" class="mb-6" role="search">
+  {% comment %}
+    The retrieval system travels as a hidden field so the pill tabs below can
+    own it as links. Keeping it here means pressing Enter in the search box
+    preserves the selected system.
+  {% endcomment %}
+  <input type="hidden" name="system" value="{{ system }}">
+
+  <div class="search-field mb-4">
+    <svg aria-hidden="true"><use href="#i-search"/></svg>
+    <input type="search" name="q" value="{{ query }}" class="input"
+           placeholder="e.g. why does electricity not get inside a metal box"
+           aria-label="Your question" autofocus>
+  </div>
+
+  <div class="hero-actions" style="margin-top:0">
+    <button type="submit" class="btn btn-primary btn-lg">
+      Search <svg aria-hidden="true"><use href="#i-arrow-right"/></svg>
+    </button>
+    {% if query %}
+    <a href="{% url 'search_compare' textbook.pk %}?q={{ query|urlencode }}"
+       class="btn btn-secondary btn-lg">
+      <svg aria-hidden="true"><use href="#i-scale"/></svg> Compare systems
+    </a>
+    {% endif %}
+  </div>
+
+  <div class="row row-wrap" style="justify-content:center;gap:var(--space-5);margin-top:var(--space-5)">
+    <label class="checkbox">
+      <input type="checkbox" name="answer" value="1" {% if want_answer %}checked{% endif %}>
+      <span>Write an answer <span class="text-muted">(adds a few seconds)</span></span>
+    </label>
+    <label class="checkbox">
+      <input type="checkbox" name="conversational" value="1" {% if conversational %}checked{% endif %}>
+      <span>Conversational follow-ups</span>
+    </label>
+  </div>
+</form>
+
+{# ── Retrieval system tabs ───────────────────────────────────────────── #}
+<nav class="tabs mb-6" style="justify-content:center" aria-label="Retrieval system">
+  {% for key, label in systems %}
+  <a class="tab {% if key == system %}is-active{% endif %}"
+     {% if key == system %}aria-current="true"{% endif %}
+     href="?q={{ query|urlencode }}&amp;system={{ key }}{% if want_answer %}&amp;answer=1{% endif %}{% if conversational %}&amp;conversational=1{% endif %}">
+    {{ label }}
+  </a>
+  {% endfor %}
+</nav>
+
+{% if query and engine_stats %}
+<p class="text-xs text-muted text-center mb-6">
+  {{ engine_stats.passages }} passages · {{ engine_stats.vocabulary }} terms ·
+  {{ engine_stats.dimensions }}-d embeddings · index scoped to this textbook
+</p>
+{% endif %}
+
+{% if trace %}
+
+{# ── Answer ──────────────────────────────────────────────────────────── #}
+{% if answer %}
+<section class="card glow-card {% if answer.grounded %}card-accent{% else %}card-warning{% endif %} mb-6"
+         aria-labelledby="answerHeading">
+  <div class="card-header">
+    <div class="row">
+      <svg class="icon-lg" style="color:{% if answer.grounded %}var(--accent){% else %}var(--warning){% endif %}"
+           aria-hidden="true">
+        <use href="#{% if answer.grounded %}i-sparkle{% else %}i-help{% endif %}"/>
+      </svg>
+      <h2 class="card-title" id="answerHeading">
+        {% if answer.grounded %}Answer{% else %}Not covered by this textbook{% endif %}
+      </h2>
+    </div>
+    <span class="card-meta mono">{{ answer.model }} · {{ answer.latency_ms|floatformat:0 }} ms</span>
+  </div>
+
+  <p class="answer-text">{{ answer.text }}</p>
+
+  {% if answer.citations %}
+  <div class="card-divider">
+    <div class="eyebrow mb-4">Sources &mdash; every claim above should trace to one</div>
+    <div class="cite-list">
+      {% for c in answer.citations %}
+      <div class="cite">
+        <a href="#passage-{{ c.marker }}" class="cite-ref">{{ c.marker }}</a>
+        <div class="grow">
+          <div class="text-secondary">{{ c.breadcrumb|default:c.citation }}</div>
+          <div class="cite-snippet">{{ c.snippet|truncatechars:150 }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% elif answer.uncited %}
+  <div class="alert alert-warning mt-4">
+    <svg aria-hidden="true"><use href="#i-alert"/></svg>
+    <div>
+      This answer cites no passage. Treat it with caution &mdash; an uncited
+      claim cannot be checked against the textbook.
+    </div>
+  </div>
+  {% endif %}
+
+  {% if not answer.grounded %}
+  <p class="text-xs text-muted mt-4">
+    {% if answer.error %}
+      The answer model could not be reached. Retrieval still worked &mdash; the
+      passages below are real results.
+    {% else %}
+      The retrieved passages do not contain this information, so the system
+      says so rather than guessing.
+    {% endif %}
+  </p>
+  {% endif %}
+</section>
+{% endif %}
+
+{# ── Query understanding ─────────────────────────────────────────────── #}
+<section class="card mb-6">
+  <div class="card-header">
+    <h2 class="card-title">Query understanding</h2>
+    <span class="card-meta mono">{{ trace.total_ms|floatformat:0 }} ms total</span>
+  </div>
+
+  <table class="table table-plain">
+    <tbody>
+      <tr>
+        <td>Query</td>
+        <td><code>{{ trace.query }}</code></td>
+      </tr>
+      {% if trace.rewrite_changed %}
+      <tr>
+        <td>Rewritten</td>
+        <td>
+          <code>{{ trace.query_rewritten }}</code>
+          <div class="text-xs text-muted mt-2">{{ trace.rewrite_reason }}</div>
+        </td>
+      </tr>
+      {% endif %}
+      <tr>
+        <td>Intent</td>
+        <td><span class="badge badge-accent">{{ trace.intent }}</span></td>
+      </tr>
+      {% if trace.expansion_terms %}
+      <tr>
+        <td>Expanded with</td>
+        <td>
+          <span class="chip-row">
+            {% for term in trace.expansion_terms %}
+            <span class="badge badge-warning">{{ term }}</span>
+            {% endfor %}
+          </span>
+          <div class="text-xs text-muted mt-2">
+            via {{ trace.expansion_method }} &mdash; terms the textbook uses that you did not type
+          </div>
+        </td>
+      </tr>
+      {% endif %}
+      {% if trace.subqueries|length > 1 %}
+      <tr>
+        <td>Split into</td>
+        <td>
+          {% for sub in trace.subqueries %}<code>{{ sub }}</code>{% if not forloop.last %} · {% endif %}{% endfor %}
+          <div class="text-xs text-muted mt-2">
+            A comparison needs evidence about both sides, so each entity is searched separately.
+          </div>
+        </td>
+      </tr>
+      {% endif %}
+      <tr>
+        <td>Pipeline</td>
+        <td class="text-sm">
+          {{ trace.retrievers_used|join:" + " }}{% if trace.fusion_method != 'none' %} &rarr; {{ trace.fusion_method }}{% endif %}{% if trace.reranker_used %} &rarr; {{ trace.reranker_used }}{% endif %}
+          <span class="text-muted">· {{ trace.candidate_count }} candidates</span>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+{# ── Results ─────────────────────────────────────────────────────────── #}
+{% if trace.results %}
+<h2 class="section-title">
+  {{ trace.results|length }} passage{{ trace.results|length|pluralize }}
+</h2>
+<p class="section-sub">Ranked by the pipeline above.</p>
+
+{% for result in trace.results %}
+<article class="card result {% if result.passage_id in answer.cited_passage_ids %}is-cited{% endif %}"
+         id="passage-{{ forloop.counter }}">
+  <div class="result-head">
+    <div class="row" style="min-width:0">
+      <span class="result-rank">#{{ result.rank }}</span>
+      {% if result.passage_id in answer.cited_passage_ids %}
+      <span class="badge badge-accent">
+        <svg aria-hidden="true"><use href="#i-check"/></svg> Cited
+      </span>
+      {% endif %}
+      <span class="result-source truncate">{{ result.breadcrumb|default:result.citation }}</span>
+    </div>
+    <div class="chip-row">
+      {% for name in result.found_by %}
+      <span class="badge">{{ name }}</span>
+      {% endfor %}
+      {% comment %}
+        rank_delta is a signed integer. The magnitude is shown beside an arrow,
+        so the minus sign has to come off the demotion case -- stringformat
+        turns it into a string first, because the slice and cut filters do
+        nothing useful to an int and would leave a double negative.
+      {% endcomment %}
+      {% if result.rerank and result.rerank.rank_delta > 0 %}
+      <span class="badge badge-success" title="promoted {{ result.rerank.rank_delta }} place(s) by the reranker">
+        &uarr; {{ result.rerank.rank_delta }}
+      </span>
+      {% elif result.rerank and result.rerank.rank_delta < 0 %}
+      <span class="badge badge-warning" title="demoted by the reranker">
+        &darr; {{ result.rerank.rank_delta|stringformat:"d"|cut:"-" }}
+      </span>
+      {% endif %}
+    </div>
+  </div>
+
+  <p class="result-text">{{ result.text|truncatechars:420 }}</p>
+
+  <details class="explain">
+    <summary>
+      <svg aria-hidden="true"><use href="#i-chevron-right"/></svg>
+      Why was this retrieved?
+    </summary>
+    <div class="explain-body">
+
+      {% if result.matched_terms %}
+      <div class="mb-4">
+        <div class="eyebrow mb-2">Matched terms</div>
+        <span class="chip-row">
+          {% for term in result.matched_terms %}
+          <span class="badge badge-warning">{{ term }}</span>
+          {% endfor %}
+        </span>
+      </div>
+      {% else %}
+      <p class="text-muted mb-4">
+        No lexical term overlap &mdash; found by meaning alone. A dense score is
+        one vector comparison and does not break down into per-term
+        contributions.
+      </p>
+      {% endif %}
+
+      <table class="table table-plain mb-4">
+        <tbody>
+          {% for name, info in result.retriever_scores.items %}
+          <tr>
+            <td>{{ name }}</td>
+            <td class="tabular">
+              {{ info.score|floatformat:3 }}{% if info.rank %} · rank {{ info.rank }}{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+          {% if result.fusion %}
+          <tr>
+            <td>fusion</td>
+            <td class="tabular">
+              {{ result.fusion.score|floatformat:5 }} · rank {{ result.fusion.rank }} ·
+              {{ result.fusion.n_retrievers }} retriever{{ result.fusion.n_retrievers|pluralize }}
+            </td>
+          </tr>
+          {% endif %}
+          {% if result.rerank %}
+          <tr>
+            <td>reranker</td>
+            <td class="tabular">
+              logit {{ result.rerank.score|floatformat:3 }} ·
+              {{ result.rerank.previous_rank }} &rarr; {{ result.rerank.rank }}
+              {% if not result.rerank.reranked %}
+              <span class="text-muted">(outside rerank depth)</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+
+      {% if result.fusion and result.fusion.shares %}
+      <div class="eyebrow mb-2">Contribution to ranking</div>
+      {% for name, share in result.fusion.shares.items %}
+      <div class="meter mb-2">
+        <span class="text-xs" style="width:62px">{{ name }}</span>
+        <div class="progress"><div class="progress-bar" style="width:{{ share|floatformat:2 }}00%"></div></div>
+        <span class="meter-value text-xs">{{ share|floatformat:2 }}</span>
+      </div>
+      {% endfor %}
+      <p class="text-xs text-muted mt-2">
+        Shares come from reciprocal-rank fusion, so they reflect each
+        retriever&rsquo;s <em>rank</em> for this passage, not its raw score.
+      </p>
+      {% endif %}
+    </div>
+  </details>
+</article>
+{% endfor %}
+
+{% else %}
+<div class="empty">
+  <svg aria-hidden="true"><use href="#i-search"/></svg>
+  <div class="empty-title">No passages matched</div>
+  <p class="empty-text">
+    {% if system == 'tfidf' or system == 'bm25' %}
+      This is a lexical system &mdash; it only finds passages that share a word
+      with your query. Try the full pipeline, which adds semantic matching and
+      query expansion.
+    {% else %}
+      Nothing in this textbook covers that. Try rephrasing, or check you are
+      searching the right book.
+    {% endif %}
+  </p>
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty">
+  <svg aria-hidden="true"><use href="#i-help"/></svg>
+  <div class="empty-title">Ask a question about this textbook</div>
+  <p class="empty-text">
+    Phrase it however you like &mdash; you do not need the textbook&rsquo;s
+    terminology. Query expansion and semantic matching bridge the gap.
+  </p>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

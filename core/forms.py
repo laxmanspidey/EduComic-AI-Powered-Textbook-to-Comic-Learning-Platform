@@ -13,19 +13,19 @@ class TextbookUploadForm(forms.ModelForm):
         fields = ['title', 'subject', 'grade_level', 'pdf_file']
         widgets = {
             'title': forms.TextInput(attrs={
-                'class': 'form-input',
+                'class': 'input',
                 'placeholder': 'e.g., Class 11 Physics NCERT',
             }),
             'subject': forms.TextInput(attrs={
-                'class': 'form-input',
+                'class': 'input',
                 'placeholder': 'e.g., Physics, Chemistry, History',
             }),
             'grade_level': forms.TextInput(attrs={
-                'class': 'form-input',
+                'class': 'input',
                 'placeholder': 'e.g., Grade 11, University',
             }),
             'pdf_file': forms.FileInput(attrs={
-                'class': 'form-file',
+                'class': 'input',
                 'accept': '.pdf',
             }),
         }
@@ -43,22 +43,22 @@ class TextbookUploadForm(forms.ModelForm):
 class RegisterForm(UserCreationForm):
     email = forms.EmailField(
         required=True,
-        widget=forms.EmailInput(attrs={'class': 'form-input', 'placeholder': 'Email'}),
+        widget=forms.EmailInput(attrs={'class': 'input', 'placeholder': 'Email'}),
     )
     first_name = forms.CharField(
         max_length=50,
         required=False,
-        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'First Name'}),
+        widget=forms.TextInput(attrs={'class': 'input', 'placeholder': 'First Name'}),
     )
 
     class Meta:
         model = User
         fields = ['username', 'email', 'first_name', 'password1', 'password2']
         widgets = {
-            'username': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Username'}),
+            'username': forms.TextInput(attrs={'class': 'input', 'placeholder': 'Username'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['password1'].widget.attrs.update({'class': 'form-input', 'placeholder': 'Password'})
-        self.fields['password2'].widget.attrs.update({'class': 'form-input', 'placeholder': 'Confirm Password'})
+        self.fields['password1'].widget.attrs.update({'class': 'input', 'placeholder': 'Password'})
+        self.fields['password2'].widget.attrs.update({'class': 'input', 'placeholder': 'Confirm Password'})

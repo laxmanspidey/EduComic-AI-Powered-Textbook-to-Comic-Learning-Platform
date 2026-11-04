@@ -1,42 +1,58 @@
 {% extends 'base.html' %}
 
-{% block title %}Login{% endblock %}
+{% block title %}Sign in{% endblock %}
 
-{% block body %}
-<div class="auth-page">
-  <div class="auth-card">
-    <div class="auth-logo">
-      <div class="auth-logo-icon">📚</div>
-      <div class="auth-logo-title font-comic">AI Comic Textbook</div>
-      <div class="auth-logo-sub">Learn Visually, Remember Forever</div>
+{% block auth_content %}
+<div class="auth">
+  <main class="auth-card">
+    <div class="auth-brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg><use href="#i-book-open"/></svg>
+      </span>
+      <div>
+        <h1 class="auth-title">Welcome back</h1>
+        <p class="auth-sub">Sign in to your EduComic library</p>
+      </div>
     </div>
 
-    <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:1.5rem;text-align:center;">Welcome back</h2>
-
     {% if form.errors %}
-    <div class="alert alert-error">Invalid username or password. Please try again.</div>
+    <div class="alert alert-danger mb-4" role="alert">
+      <svg aria-hidden="true"><use href="#i-alert"/></svg>
+      <div>
+        <div class="alert-title">Could not sign in</div>
+        That username and password do not match an account.
+      </div>
+    </div>
     {% endif %}
 
-    <form method="post">
+    <form method="post" novalidate>
       {% csrf_token %}
-      <div class="form-group">
-        <label class="form-label">Username</label>
-        <input type="text" name="username" class="form-input" placeholder="Enter your username" required autofocus>
+
+      <div class="field">
+        <label class="label" for="id_username">Username</label>
+        <input class="input" type="text" name="username" id="id_username"
+               autocomplete="username" autofocus required
+               placeholder="Your username">
       </div>
-      <div class="form-group">
-        <label class="form-label">Password</label>
-        <input type="password" name="password" class="form-input" placeholder="Enter your password" required>
+
+      <div class="field">
+        <label class="label" for="id_password">Password</label>
+        <input class="input" type="password" name="password" id="id_password"
+               autocomplete="current-password" required
+               placeholder="Your password">
       </div>
-      <input type="hidden" name="next" value="{{ next }}">
-      <button type="submit" class="btn btn-primary btn-full btn-lg" style="margin-top:0.5rem;">
-        Sign In →
+
+      {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+      <button type="submit" class="btn btn-primary btn-block btn-lg mt-6">
+        Sign in
+        <svg aria-hidden="true"><use href="#i-arrow-right"/></svg>
       </button>
     </form>
 
-    <div class="divider"></div>
-    <p style="text-align:center;font-size:0.875rem;color:var(--text-muted);">
-      No account? <a href="{% url 'register' %}" class="text-accent">Create one free</a>
-    </p>
-  </div>
+    <div class="auth-foot">
+      New here? <a href="{% url 'register' %}">Create an account</a>
+    </div>
+  </main>
 </div>
 {% endblock %}

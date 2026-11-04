@@ -187,3 +187,130 @@ class StudentProgress(models.Model):
         if self.quiz_attempts == 0:
             return 0
         return int((self.quiz_correct / self.quiz_attempts) * 100)
+
+
+# ─── Information Retrieval ────────────────────────────────────────────────────
+#
+# Only live state lives in the database. Evaluation artefacts -- the test
+# collection, qrels and experiment runs -- are files under ir/data/, because
+# they must be reproducible and version-controllable, and because the
+# evaluation runs as a plain script without Django loaded.
+
+
+class SearchSession(models.Model):
+    """
+    A conversation with one textbook.
+
+    Exists so multi-turn query rewriting has history to resolve against: when
+    a student asks "why does it increase?", the referent is in the previous
+    turn, not in the query.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE,
+                             related_name='search_sessions')
+    textbook = models.ForeignKey(Textbook, on_delete=models.CASCADE,
+                                 related_name='search_sessions')
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_active = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-last_active']
+
+    def __str__(self):
+        return f"Search session: {self.textbook.title} ({self.user.username})"
+
+    def history(self, limit: int = 4):
+        """
+        Recent turns, oldest first, in the form the rewriter expects.
+
+        Returns `ir.query.rewrite.ConversationTurn` objects. Capped because
+        referents almost always point at the immediately preceding turn, and a
+        longer window invites the rewriter to drag in stale topics.
+        """
+        from ir.query.rewrite import ConversationTurn
+
+        turns = list(self.queries.order_by('-created_at')[:limit])
+        turns.reverse()
+        return [ConversationTurn(query=t.query_text, answer=t.top_snippet)
+                for t in turns]
+
+
+class SearchQuery(models.Model):
+    """
+    One executed search, with its retrieval trace.
+
+    The trace is stored whole as JSON rather than normalised into columns. It
+    is write-once diagnostic data whose shape changes as pipeline stages are
+    added, and it is only ever read back for the query it belongs to, so a
+    schema migration per new stage would be pure cost.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session = models.ForeignKey(SearchSession, on_delete=models.CASCADE,
+                                related_name='queries', null=True, blank=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE,
+                             related_name='search_queries')
+    textbook = models.ForeignKey(Textbook, on_delete=models.CASCADE,
+                                 related_name='search_queries')
+
+    query_text = models.TextField()
+    rewritten_text = models.TextField(blank=True)
+    intent = models.CharField(max_length=32, blank=True)
+    system = models.CharField(max_length=32, default='full')
+
+    expansion_terms = models.JSONField(default=list)
+    trace = models.JSONField(default=dict)
+
+    result_count = models.IntegerField(default=0)
+    top_snippet = models.TextField(blank=True)
+    total_ms = models.FloatField(default=0.0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name_plural = 'search queries'
+
+    def __str__(self):
+        return f"{self.query_text[:60]} ({self.result_count} results)"
+
+    @property
+    def was_rewritten(self) -> bool:
+        return bool(self.rewritten_text
+                    and self.rewritten_text.strip() != self.query_text.strip())
+
+    @property
+    def stage_timings(self) -> dict:
+        return self.trace.get('timings_ms', {}) if self.trace else {}
+
+
+class RelevanceJudgement(models.Model):
+    """
+    A human relevance judgement, for verifying the synthetic test collection.
+
+    The generated collection assumes the passage a question was written from
+    is the relevant one. That assumption needs checking on a subset, and the
+    agreement rate between human and synthetic judgements is itself a
+    reportable result. Exported to qrels.jsonl to be merged with the generated
+    judgements, which keep the higher grade on conflict.
+    """
+    GRADE_CHOICES = [
+        (0, 'Not relevant'),
+        (1, 'Partially relevant'),
+        (2, 'Highly relevant'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE,
+                             related_name='judgements')
+    query_id = models.CharField(max_length=64)
+    query_text = models.TextField()
+    passage_id = models.CharField(max_length=128)
+    passage_text = models.TextField(blank=True)
+    grade = models.IntegerField(choices=GRADE_CHOICES, default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['query_id', 'passage_id']
+        unique_together = ['user', 'query_id', 'passage_id']
+
+    def __str__(self):
+        return f"{self.query_id} / {self.passage_id}: {self.grade}"

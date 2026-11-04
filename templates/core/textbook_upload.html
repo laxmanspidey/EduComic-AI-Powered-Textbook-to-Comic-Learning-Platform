@@ -1,114 +1,129 @@
 {% extends 'base.html' %}
 
-{% block title %}Upload Textbook{% endblock %}
+{% block title %}Upload a textbook{% endblock %}
+{% block topbar %}Upload a textbook{% endblock %}
+{% block content_class %}content-narrow{% endblock %}
 
 {% block content %}
-<div style="max-width:680px; margin:0 auto;">
-  <div class="page-header">
-    <div class="breadcrumb">
-      <a href="{% url 'dashboard' %}">Dashboard</a>
-      <span class="breadcrumb-sep">›</span>
-      <span>Upload Textbook</span>
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <a href="{% url 'dashboard' %}">Dashboard</a>
+  <span class="breadcrumb-sep" aria-hidden="true">/</span>
+  <span aria-current="page">Upload</span>
+</nav>
+
+<div class="page-header">
+  <h1 class="page-title">Upload a textbook</h1>
+  <p class="page-subtitle">
+    A PDF is split into passages, indexed for search, and divided into
+    subtopics you can generate comics and quizzes from.
+  </p>
+</div>
+
+<form method="post" enctype="multipart/form-data" class="stack" novalidate>
+  {% csrf_token %}
+
+  {% if form.errors %}
+  <div class="alert alert-danger" role="alert">
+    <svg aria-hidden="true"><use href="#i-alert"/></svg>
+    <div>
+      <div class="alert-title">Check the form</div>
+      {% for field, errors in form.errors.items %}
+        {{ errors|join:" " }}
+      {% endfor %}
     </div>
-    <h1 class="page-title">📤 Upload Your Textbook</h1>
-    <p class="page-subtitle">
-      Upload any PDF textbook. AI will extract chapters, identify key concepts, and prepare comic lessons.
-    </p>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">The file</div>
+    </div>
+
+    <label class="dropzone" for="{{ form.pdf_file.id_for_label }}" id="dropzone">
+      <svg aria-hidden="true"><use href="#i-upload"/></svg>
+      <div class="dropzone-title" id="dropzoneTitle">Choose a PDF</div>
+      <div class="dropzone-hint">Text-based PDF, up to 50&nbsp;MB</div>
+      {{ form.pdf_file }}
+    </label>
+
+    <div class="alert alert-info mt-4">
+      <svg aria-hidden="true"><use href="#i-info"/></svg>
+      <div>
+        <div class="alert-title">Scanned PDFs will not work</div>
+        A scanned book is a stack of images with no extractable text, so it
+        produces no passages and cannot be searched. Shorter documents of
+        5&ndash;10 pages process fastest.
+      </div>
+    </div>
   </div>
 
   <div class="card">
-    <form method="post" enctype="multipart/form-data" id="upload-form">
-      {% csrf_token %}
+    <div class="card-header">
+      <div class="card-title">Details</div>
+    </div>
 
-      <!-- File Drop Zone -->
-      <div class="upload-zone" id="drop-zone">
-        <div class="upload-zone-icon">📄</div>
-        <div class="upload-zone-title">Drop your PDF here</div>
-        <div class="upload-zone-sub">or click to browse · Max 50 MB</div>
-        <input type="file" name="pdf_file" id="pdf-input" accept=".pdf"
-               style="position:absolute;inset:0;opacity:0;cursor:pointer;">
+    <div class="field">
+      <label class="label" for="{{ form.title.id_for_label }}">Title</label>
+      {{ form.title }}
+      <div class="hint">How it appears in your library.</div>
+    </div>
+
+    <div class="grid grid-2">
+      <div class="field mb-0">
+        <label class="label" for="{{ form.subject.id_for_label }}">Subject <span class="text-muted">(optional)</span></label>
+        {{ form.subject }}
       </div>
-
-      <div id="file-preview" style="display:none; margin-top:1rem;" class="card" style="background:var(--bg-elevated);">
-        <div class="flex items-center gap-2">
-          <span style="font-size:1.5rem;">📄</span>
-          <div>
-            <div id="file-name" style="font-weight:600; font-size:0.9rem;"></div>
-            <div id="file-size" style="font-size:0.75rem; color:var(--text-muted);"></div>
-          </div>
-          <button type="button" onclick="clearFile()" class="btn btn-secondary btn-sm" style="margin-left:auto;">✕</button>
-        </div>
+      <div class="field mb-0">
+        <label class="label" for="{{ form.grade_level.id_for_label }}">Level <span class="text-muted">(optional)</span></label>
+        {{ form.grade_level }}
       </div>
-
-      <div class="divider"></div>
-
-      <div class="form-group">
-        <label class="form-label">Textbook Title *</label>
-        <input type="text" name="title" class="form-input" placeholder="e.g., Class 11 Physics NCERT" required>
-      </div>
-
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
-        <div class="form-group">
-          <label class="form-label">Subject</label>
-          <input type="text" name="subject" class="form-input" placeholder="e.g., Physics">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Grade / Level</label>
-          <input type="text" name="grade_level" class="form-input" placeholder="e.g., Grade 11">
-        </div>
-      </div>
-
-      <div class="alert alert-info" style="margin-top:0.5rem;">
-        💡 After upload, AI will automatically extract chapters and key concepts. This takes 1–3 minutes depending on the PDF size.
-      </div>
-
-      <button type="submit" class="btn btn-comic btn-full btn-lg" id="submit-btn">
-        🚀 Upload & Process Textbook
-      </button>
-    </form>
+    </div>
   </div>
-</div>
+
+  <div class="row-between row-wrap">
+    <a href="{% url 'dashboard' %}" class="btn btn-ghost">Cancel</a>
+    <button type="submit" class="btn btn-primary btn-lg">
+      <svg aria-hidden="true"><use href="#i-upload"/></svg> Upload and process
+    </button>
+  </div>
+</form>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-const dropZone = document.getElementById('drop-zone');
-const fileInput = document.getElementById('pdf-input');
-const preview = document.getElementById('file-preview');
-const submitBtn = document.getElementById('submit-btn');
+(function () {
+  // Reflect the chosen filename in the drop zone, and support drag-and-drop
+  // onto it. The native file input stays the source of truth so the form
+  // works identically without JavaScript.
+  var zone = document.getElementById('dropzone');
+  var title = document.getElementById('dropzoneTitle');
+  var input = zone ? zone.querySelector('input[type="file"]') : null;
+  if (!input) return;
 
-fileInput.addEventListener('change', () => {
-  if (fileInput.files[0]) showFile(fileInput.files[0]);
-});
-
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-dropZone.addEventListener('drop', e => {
-  e.preventDefault();
-  dropZone.classList.remove('dragover');
-  const f = e.dataTransfer.files[0];
-  if (f && f.name.endsWith('.pdf')) {
-    fileInput.files = e.dataTransfer.files;
-    showFile(f);
+  function show() {
+    var file = input.files && input.files[0];
+    title.textContent = file ? file.name : 'Choose a PDF';
   }
-});
+  input.addEventListener('change', show);
 
-function showFile(f) {
-  document.getElementById('file-name').textContent = f.name;
-  document.getElementById('file-size').textContent = (f.size / 1024 / 1024).toFixed(1) + ' MB';
-  preview.style.display = 'block';
-  dropZone.style.display = 'none';
-}
-
-function clearFile() {
-  fileInput.value = '';
-  preview.style.display = 'none';
-  dropZone.style.display = 'block';
-}
-
-document.getElementById('upload-form').addEventListener('submit', () => {
-  submitBtn.disabled = true;
-  submitBtn.textContent = '⏳ Uploading...';
-});
+  ['dragenter', 'dragover'].forEach(function (name) {
+    zone.addEventListener(name, function (e) {
+      e.preventDefault();
+      zone.classList.add('is-active');
+    });
+  });
+  ['dragleave', 'drop'].forEach(function (name) {
+    zone.addEventListener(name, function (e) {
+      e.preventDefault();
+      zone.classList.remove('is-active');
+    });
+  });
+  zone.addEventListener('drop', function (e) {
+    if (e.dataTransfer && e.dataTransfer.files.length) {
+      input.files = e.dataTransfer.files;
+      show();
+    }
+  });
+})();
 </script>
 {% endblock %}

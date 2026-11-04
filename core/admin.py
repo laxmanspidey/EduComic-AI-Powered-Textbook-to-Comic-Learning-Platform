@@ -42,3 +42,7 @@ class QuizAdmin(admin.ModelAdmin):
 @admin.register(StudentProgress)
 class StudentProgressAdmin(admin.ModelAdmin):
     list_display = ['user', 'concept', 'viewed', 'quiz_attempts', 'quiz_correct']
+
+# Retrieval models live in their own module; import it so autodiscovery
+# registers them alongside the comic application models.
+from . import ir_admin  # noqa: F401,E402

@@ -21,3 +21,14 @@ Thumbs.db
 
 # Logs
 *.log
+# ── Information Retrieval artefacts ──────────────────────────────────────
+# Derived data, all regenerable and all keyed by content so a stale copy is
+# never used. The test collection under ir/data/collection/ is deliberately
+# NOT ignored: it is the fixed query set every reported result is measured
+# against, so it belongs in version control for reproducibility.
+ir/data/embeddings/
+ir/data/expansion/
+ir/data/rewrite/
+ir/data/runs/
+
+aicomic2.zip
